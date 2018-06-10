@@ -1,0 +1,79 @@
+Installation instructions
+1. Copy the entire Capext folder to a working directory in a Linux environment
+
+2. Convert the gds layout file to a process .geo file:
+ cd Capext/gds2geo
+ python caplet_gds2geo.py -l LAYER_FILE GDS_FILE
+This command converts the file_name.gds file to the file_name.geo file. Will file_name.geo
+The file is moved to the Capext file directory.
+[Note] The version of python here is 2.7
+
+Note: The LAYER_FILE here refers to the layer number information of the gds layout file.
+The name of the metal layer and the via layer, the layer number, the altitude at the bottom of the layer, and the thickness of the layer. For example,
+
+The example given in the folder, inverter.layer, is as follows:
+METAL{
+# name, layer, datatype, height, thickness (# indicates a comment)
+pc  7  0  0.2  0.07
+# indicates the polysilicon layer, layer number 7, data type 0, the height of the bottom of this layer is 0.2 (um), and the thickness is 0.07 (um)
+
+m1  15	0	0.4	0.14
+# Metal layer m1, layer number 15, data type 0, bottom height 0.4um, thickness 0.14um, others are similar
+m2 17 0 0.7 0.14 # m2 m2
+m3 19 0 1.0 0.14 # m3 m3
+}
+VIA{
+# layer, datatype, bottom, top
+ca 	14	0 	pc m1
+#contact layer, layer number 14, data type 0, the next layer is the pc layer, the upper layer is the m1 layer
+V1 16 0 m1 m2
+V2 18 0 m2 m3
+}
+# In this test, the polysilicon layer is treated as a metal layer, and the contact and via are treated as a via.
+
+
+3, generate an offline data table to store the surface Green's function and weight function:
+ cd Capext/DataTables
+ g++ preCompute.cpp -lpthread
+ ./a.out SIZE_OF_TABLE 
+
+Description:
+
+(1) SIZE_OF_TABLE indicates the size of the offline data table, eg if SIZE_OF_TABLE=2000,
+The offline data table of the generated Green function and weight function is a 2000×2000 two-dimensional matrix. The larger the size of the general two-dimensional matrix, the more accurate the result of the capacitance calculation. For example, if we need to generate 2000x2000 the offline data table, then the command to execute is:
+ ./a.out 2000
+
+(2) The program will create 40 threads and calculate the offline data of the surface Green function and 3 weight functions table. therefore, we suggest that the program be executed on a multi-core processor.
+
+
+4, compile and perform the capacitor extraction process
+First compile:
+ cd Capext
+ g++ main.cpp -lpthread -O2
+
+Explanation:
+
+(1) The program uses the c++ boost library, so it needs to be installed on the linux platform of the boost library to compile.
+
+(2) If there is no boost library on the platform, you can download it from http://www.boost.org/ and unzip it to a work directory then unzip. Take the boost_1_60_0 version as an example. After pressurization, it is called boost_1_60_0 folder. Then the command to compile main.cpp is
+
+ g++ main.cpp -lpthread -I working directory/boost_1_60_0/ -O2
+
+(3) -O2 is a compiler optimization option that can be omitted, but with a significant increase in speed
+
+Then perform the calculation:
+ ./a.out Input-geo-file  Number-of-Threads  Maximum-capacitance-error  Maximum-Number-per-conductor-random-walk Capacitance-matrix-output-file
+Explanation:
+This command has five parameters
+(1) The input geo file: the geo file name generated in step 2 file_name.geo
+(2) Threads: Indicates that several threads are used for parallel computing
+(3) Maximum capacitance error (percentage): specifies the upper limit of the error of self-capacitance of each conductor and its mutual capacitance with other conductors. 
+(4) The maximum number of random walks per conductor: Indicates starting from each conductor for random walk (PATH)
+(5) The output file of the capacitance matrix. 
+
+For random walks from each conductor: When the number of random walks exceeds the specified maximum number, or the self-capacity of the conductor and its mutual capacitance with other conductors satisfy the error that the error is less than the set maximum error value, the random walk process will stop. E.g:
+
+ ./a.out cap_inverter.geo 8 1 10000000 capOut.txt
+
+Indicates that the cap_nand.geo file is read and calculated in 8 threads in parallel; the upper limit of the capacitance error is 1%.
+Conduct up to 10,000,000 random walks from each conductor, and finally output the result of the capacitance matrix to the capOut.txt file.
